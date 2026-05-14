@@ -4,7 +4,7 @@
 - Phase 1 complete: Albus (orchestrator), Dobby (quick tasks), Hedwig (Gmail, multi-account)
 - FastAPI backend with routes, SQLite DB with 7 tables
 - Multi-account Gmail support: personal, agaetis, houseofworktops — each with separate OAuth tokens
-- Next.js dashboard (dark theme): /, /emails, /tasks, /logs, /houseofworktops
+- Next.js dashboard (dark theme): /, /emails, /tasks, /logs — houseofworktops is light theme
 - APScheduler: Hedwig runs every 30 min, daily summary at 08:00
 - Obsidian sync: daily note writer
 - CI: ruff + pytest on push to main
@@ -15,8 +15,14 @@
 - `backend/tools/order_parser.py`: pure-regex parser, returns `{ order, customer, items }`, never crashes on missing fields
 - `backend/agents/hedwig.py`: added `is_order_email(subject, sender)` check; order emails skip Claude and go directly to parser; atomic save via `_save_order_atomic` (rollback on failure, idempotent on duplicate order_id)
 - `backend/routers/orders.py`: four endpoints — `/orders/today`, `/orders/summary`, `/orders/all`, `/orders/{order_id}`
-- `frontend/app/houseofworktops/page.tsx`: client component — stats bar, record cards, filterable+sortable orders table with expandable rows showing full detail, auto-refreshes every 5 min
+- `frontend/app/houseofworktops/page.tsx`: client component — stats bar, record cards, top products; auto-refreshes every 5 min
 - Nav updated: "House of Worktops" link added
+
+### Session — Dashboard refresh fix, light theme, Gmail pagination, backfill
+- `frontend/app/houseofworktops/page.tsx`: light theme (white/light-grey, dark text, subtle shadows); removed orders table; auto-refresh reduced from 5 min to 60 s; "Last updated: Xs ago" indicator top-right; added status breakdown and top products sections
+- `backend/tools/gmail.py`: fixed `_extract_body` — was returning only `text/plain` (stub fallback on HTML-only emails); now falls back to stripped HTML; added `_extract_mime`, `_strip_html`; added `get_all_emails_by_subject_pattern` which paginates all results (no max_results cap)
+- `backend/routers/orders.py`: added `POST /orders/backfill` — fetches all historical HoW order emails, parses, inserts new ones (idempotent), returns `{found, new, skipped}`
+- Backfill ran: 40 order emails found, 39 new orders inserted, 1 skipped (already in DB); all 40 orders now have full data (date_added, status, grand_total, customer, items)
 
 ### Session — Gmail OAuth for houseofworktops
 - `backend/tools/gmail_auth.py`: new CLI script — takes account name as arg, prompts for credentials JSON path, runs browser OAuth flow, saves token to `gmail_tokens/<account>.json`
@@ -35,6 +41,7 @@ Windows machine setup:
 4. Set up NSSM services for FastAPI and Next.js (see `/docs/windows-setup.md`)
 5. Set `OBSIDIAN_VAULT_PATH` in `.env`
 6. Write first real tests in `/tests/` — order_parser is a good first target (pure functions, no DB)
+7. Run `POST /orders/backfill` on Windows after Gmail OAuth is set up to pull all historical orders into production DB
 
 ## Files touched this session
 - `backend/memory/schema.py` — replaced Order model; added OrderCustomer, OrderItem
@@ -91,6 +98,7 @@ cd frontend && npm run dev
 | GET | `/orders/summary` | All-time stats, records, top products |
 | GET | `/orders/all` | Paginated list with customer + items nested |
 | GET | `/orders/{order_id}` | Full order detail |
+| POST | `/orders/backfill` | Fetch all historical HoW order emails, insert new ones |
 
 ### Agents
 
@@ -121,8 +129,10 @@ cd frontend && npm run dev
   ```
 - `load_gmail_service(account)` → authenticated service object
 - `get_unread_emails(account, max_results=10)` → list of `{id, subject, sender, date, snippet, body_preview, full_body}`
-- `get_emails_by_subject_pattern(account, pattern, max_results=20)` → filtered by subject
+- `get_emails_by_subject_pattern(account, pattern, max_results=20)` → filtered by subject (first page only)
+- `get_all_emails_by_subject_pattern(account, pattern)` → all matching emails, paginated (use for backfill/historical)
 - `mark_as_read(account, email_id)`
+- Body extraction: tries `text/plain` first; falls back to stripped HTML if text/plain < 200 chars (HoW emails are HTML-only)
 
 ### Environment variables (see `.env.example` for full list)
 

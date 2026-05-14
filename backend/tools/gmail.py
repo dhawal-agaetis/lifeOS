@@ -1,4 +1,5 @@
 import base64
+import re
 from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -91,6 +92,32 @@ def get_unread_emails(account: str, max_results: int = 10) -> list[dict]:
     return emails
 
 
+def get_recent_emails(account: str, max_results: int = 50) -> list[dict]:
+    """Fetch recent emails regardless of read/unread status.
+
+    Preferred over get_unread_emails for high-volume inboxes — read/unread
+    status is unreliable as a processing gate (opening an email in Gmail
+    removes it from the unread feed). Use DB gmail_id tracking instead.
+    """
+    service = _get_service(account)
+    result = service.users().messages().list(
+        userId="me",
+        maxResults=max_results,
+    ).execute()
+
+    messages = result.get("messages", [])
+    emails = []
+    for msg in messages:
+        detail = service.users().messages().get(
+            userId="me", id=msg["id"], format="full"
+        ).execute()
+        parsed = _parse_message(detail)
+        parsed["account"] = account
+        emails.append(parsed)
+
+    return emails
+
+
 def get_emails_by_subject_pattern(
     account: str, pattern: str, max_results: int = 20
 ) -> list[dict]:
@@ -105,6 +132,38 @@ def get_emails_by_subject_pattern(
     messages = result.get("messages", [])
     emails = []
     for msg in messages:
+        detail = service.users().messages().get(
+            userId="me", id=msg["id"], format="full"
+        ).execute()
+        parsed = _parse_message(detail)
+        parsed["account"] = account
+        emails.append(parsed)
+
+    return emails
+
+
+def get_all_emails_by_subject_pattern(account: str, pattern: str) -> list[dict]:
+    """Paginate through all Gmail results matching `pattern` in subject.
+
+    Gmail's maxResults cap is 500 per page; this loops until no nextPageToken.
+    Use for backfill / historical fetches where total count is unknown.
+    """
+    service = _get_service(account)
+    message_stubs: list[dict] = []
+    page_token: str | None = None
+
+    while True:
+        kwargs: dict = {"userId": "me", "q": f"subject:{pattern}", "maxResults": 500}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        result = service.users().messages().list(**kwargs).execute()
+        message_stubs.extend(result.get("messages", []))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+
+    emails = []
+    for msg in message_stubs:
         detail = service.users().messages().get(
             userId="me", id=msg["id"], format="full"
         ).execute()
@@ -148,17 +207,42 @@ def _parse_message(msg: dict) -> dict:
 
 
 def _extract_body(payload: dict) -> str:
-    if "body" in payload and payload["body"].get("data"):
+    plain = _extract_mime(payload, "text/plain")
+    # Many HoW emails are HTML-only; the text/plain part is a stub fallback message.
+    # Fall back to stripped HTML when text/plain is too short to contain order data.
+    if len(plain) >= 200:
+        return plain
+    html = _extract_mime(payload, "text/html")
+    if html:
+        return _strip_html(html)
+    return plain
+
+
+def _extract_mime(payload: dict, mime: str) -> str:
+    """Recursively find the first part matching `mime` and decode its body."""
+    if "body" in payload and payload["body"].get("data") and not payload.get("parts"):
+        # Simple (non-multipart) message — return regardless of mime type
         return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
     for part in payload.get("parts", []):
-        if part.get("mimeType") == "text/plain" and part["body"].get("data"):
+        if part.get("mimeType") == mime and part["body"].get("data"):
             return base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8", errors="ignore")
-        # recurse into multipart
         if part.get("mimeType", "").startswith("multipart"):
-            result = _extract_body(part)
+            result = _extract_mime(part, mime)
             if result:
                 return result
     return ""
+
+
+def _strip_html(html: str) -> str:
+    """Strip HTML tags and decode common entities — good enough for structured order emails."""
+    import html as html_module
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = html_module.unescape(text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t\xa0]+", " ", text)  # collapse whitespace + non-breaking spaces
+    text = re.sub(r" *\n *", "\n", text)      # strip spaces around newlines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def _build_raw_message(to: str, subject: str, body: str) -> str:

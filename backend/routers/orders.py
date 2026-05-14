@@ -1,9 +1,13 @@
+import logging
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, cast, Date
+from sqlalchemy import desc
 
 from backend.memory.db import get_db
 from backend.memory.schema import Order, OrderCustomer, OrderItem
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -149,6 +153,47 @@ def orders_all(
             for o in page_orders
         ],
     }
+
+
+@router.post("/backfill")
+def orders_backfill(db: Session = Depends(get_db)):
+    """Fetch all historical HoW order emails and insert any not already in DB.
+
+    Safe to call repeatedly — _save_order_atomic is idempotent on order_id.
+    Returns counts: found (order emails), new (inserted), skipped (already in DB).
+    """
+    from backend.tools.gmail import get_all_emails_by_subject_pattern, is_authenticated
+    from backend.tools.order_parser import parse_order_email
+    from backend.agents.hedwig import is_order_email, _save_order_atomic
+
+    if not is_authenticated("houseofworktops"):
+        return {"error": "houseofworktops account not authenticated — run gmail_auth.py first"}
+
+    emails = get_all_emails_by_subject_pattern("houseofworktops", "House of Worktops")
+    order_emails = [e for e in emails if is_order_email(e["subject"], e["sender"])]
+
+    found = len(order_emails)
+    new_count = 0
+    skipped = 0
+
+    for email in order_emails:
+        parsed = parse_order_email(
+            email["subject"],
+            email.get("full_body", email.get("body_preview", "")),
+            email["gmail_id"],
+        )
+        order_id = (parsed.get("order") or {}).get("order_id")
+        if not order_id:
+            skipped += 1
+            continue
+        if db.query(Order).filter(Order.order_id == order_id).first():
+            skipped += 1
+        else:
+            _save_order_atomic(db, parsed, "houseofworktops")
+            new_count += 1
+
+    logger.info(f"Backfill complete: found={found} new={new_count} skipped={skipped}")
+    return {"found": found, "new": new_count, "skipped": skipped}
 
 
 @router.get("/{order_id}")

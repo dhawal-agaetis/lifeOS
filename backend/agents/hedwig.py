@@ -82,7 +82,7 @@ def run(task: str, db: Session, accounts: list[str] | None = None) -> str:
     Fetch and process emails for the given accounts (defaults to all three).
     Returns a digest with a separate section per inbox.
     """
-    from backend.tools.gmail import get_unread_emails, is_authenticated
+    from backend.tools.gmail import get_unread_emails, get_recent_emails, is_authenticated
 
     targets = accounts or ALL_ACCOUNTS
     sections: list[str] = []
@@ -94,7 +94,11 @@ def run(task: str, db: Session, accounts: list[str] | None = None) -> str:
             continue
 
         try:
-            emails = get_unread_emails(account, max_results=10)
+            limit = 50 if account == "houseofworktops" else 10
+            if account == "houseofworktops":
+                emails = get_recent_emails(account, max_results=limit)
+            else:
+                emails = get_unread_emails(account, max_results=limit)
         except Exception as e:
             logger.error(f"Hedwig fetch error ({account}): {e}")
             sections.append(f"*{_label(account)}*: fetch failed — {e}")
@@ -106,8 +110,12 @@ def run(task: str, db: Session, accounts: list[str] | None = None) -> str:
 
         lines: list[str] = []
         for raw in emails:
+            # Skip emails already in the DB (idempotency gate — safer than unread filter)
+            if db.query(Email).filter(Email.gmail_id == raw["gmail_id"]).first():
+                continue
+
             if account == "houseofworktops" and is_order_email(raw["subject"], raw["sender"]):
-                parsed_order = parse_order_email(raw["subject"], raw.get("body", raw["body_preview"]), raw["gmail_id"])
+                parsed_order = parse_order_email(raw["subject"], raw.get("full_body", raw["body_preview"]), raw["gmail_id"])
                 _save_order_atomic(db, parsed_order, account)
                 _save_email(db, raw, {"is_order": True, "summary": f"Order {parsed_order['order']['order_id']}"}, account)
                 lines.append(f"• {raw['sender']}: Order {parsed_order['order']['order_id']} — {parsed_order['order']['status']}")
@@ -116,8 +124,9 @@ def run(task: str, db: Session, accounts: list[str] | None = None) -> str:
                 _save_email(db, raw, parsed, account)
                 lines.append(_format_line(account, raw, parsed))
 
-        total += len(emails)
-        header = f"*{_label(account)}* ({len(emails)} unread)"
+        new_count = len(lines)
+        total += new_count
+        header = f"*{_label(account)}* ({new_count} new)"
         sections.append(header + "\n" + "\n".join(lines))
 
     digest = f"Email check — {total} unread across {len(targets)} inbox(es).\n\n" + "\n\n".join(sections)
