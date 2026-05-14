@@ -79,12 +79,10 @@ export default function HouseOfWorktopsPage() {
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {[
             { label: "Orders today", value: today?.count ?? "—" },
-            { label: "Revenue today", value: today ? `£${today.total_revenue.toFixed(2)}` : "—" },
             { label: "All time orders", value: summary?.total_orders ?? "—" },
-            { label: "All time revenue", value: summary ? `£${summary.total_revenue.toFixed(2)}` : "—" },
           ].map((s) => (
             <StatCard key={s.label} label={s.label} value={String(s.value)} />
           ))}
@@ -92,20 +90,11 @@ export default function HouseOfWorktopsPage() {
 
         {/* Record cards */}
         {summary && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <RecordCard
               label="Highest orders in a day"
               value={String(summary.highest_orders_in_a_day.count || "—")}
               sub={summary.highest_orders_in_a_day.date ?? ""}
-            />
-            <RecordCard
-              label="Highest revenue in a day"
-              value={
-                summary.highest_revenue_in_a_day.amount
-                  ? `£${summary.highest_revenue_in_a_day.amount.toFixed(2)}`
-                  : "—"
-              }
-              sub={summary.highest_revenue_in_a_day.date ?? ""}
             />
             <RecordCard
               label="Average order value"
@@ -113,46 +102,6 @@ export default function HouseOfWorktopsPage() {
               sub={`across ${summary.total_orders} orders`}
             />
           </div>
-        )}
-
-        {/* Status breakdown */}
-        {summary && Object.keys(summary.orders_by_status).length > 0 && (
-          <Section title="Orders by status">
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(summary.orders_by_status).map(([status, count]) => (
-                <div
-                  key={status}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
-                  style={{ background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}
-                >
-                  <span style={{ color: statusColour(status) }}>●</span>
-                  <span style={{ color: "#374151" }}>{status}</span>
-                  <span className="font-semibold" style={{ color: "#0f172a" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Top products */}
-        {summary && summary.top_products.length > 0 && (
-          <Section title="Top products">
-            <div className="space-y-2">
-              {summary.top_products.map((p, i) => (
-                <div
-                  key={p.product}
-                  className="flex items-center justify-between px-4 py-2.5 rounded-lg text-sm"
-                  style={{ background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono w-5 text-right" style={{ color: "#94a3b8" }}>{i + 1}</span>
-                    <span style={{ color: "#374151" }}>{p.product}</span>
-                  </div>
-                  <span className="font-semibold" style={{ color: "#0f172a" }}>×{p.total_quantity}</span>
-                </div>
-              ))}
-            </div>
-          </Section>
         )}
 
       </div>
@@ -193,19 +142,3 @@ function RecordCard({ label, value, sub }: { label: string; value: string; sub: 
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "#64748b" }}>{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-function statusColour(status: string): string {
-  const s = status.toLowerCase();
-  if (s === "processing") return "#f59e0b";
-  if (s === "complete" || s === "completed") return "#10b981";
-  if (s === "cancelled" || s === "canceled") return "#ef4444";
-  return "#94a3b8";
-}
