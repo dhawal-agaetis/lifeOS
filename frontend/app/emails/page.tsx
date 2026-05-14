@@ -37,8 +37,8 @@ export default async function EmailsPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">{e.subject || "(no subject)"}</span>
-                <span className={`text-xs px-2 py-0.5 rounded ${e.processed ? "text-green-400" : "text-yellow-400"}`}
-                  style={{ background: "var(--bg)" }}>
+                <span className={`text-xs px-2 py-0.5 rounded ${e.processed ? "text-green-600" : "text-yellow-600"}`}
+                  style={{ background: "var(--border)" }}>
                   {e.processed ? "processed" : "unread"}
                 </span>
               </div>

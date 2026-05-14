@@ -35,10 +35,10 @@ export default async function LogsPage() {
               style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
             >
               <div className="flex items-center gap-3">
-                <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "#1e1b4b", color: "var(--accent)" }}>
+                <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "#eef2ff", color: "var(--accent)" }}>
                   {l.agent_name}
                 </span>
-                <span className={`text-xs ${l.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                <span className={`text-xs ${l.status === "success" ? "text-green-600" : "text-red-500"}`}>
                   {l.status}
                 </span>
                 <span className="text-xs ml-auto" style={{ color: "var(--muted)" }}>

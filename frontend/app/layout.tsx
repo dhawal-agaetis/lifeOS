@@ -12,6 +12,7 @@ const nav = [
   { href: "/emails", label: "Emails" },
   { href: "/tasks", label: "Tasks" },
   { href: "/logs", label: "Logs" },
+  { href: "/houseofworktops", label: "House of Worktops" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link
               key={n.href}
               href={n.href}
-              className="transition-colors hover:text-white"
+              className="transition-colors hover:text-gray-900"
               style={{ color: "var(--muted)" }}
             >
               {n.label}

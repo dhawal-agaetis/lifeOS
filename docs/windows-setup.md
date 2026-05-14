@@ -155,3 +155,20 @@ This opens a browser, you log in to Google, and a `token.json` is saved. After t
 - **Service won't start**: Check logs in `C:\lifeos\logs\`
 - **Python imports fail**: Make sure `PYTHONPATH=C:\lifeos` is set in the NSSM service environment
 - **Gmail auth fails**: Re-run the one-time OAuth step and ensure `credentials.json` is present
+
+---
+
+## Branch and deployment notes
+
+The Windows machine tracks **main only** — the stable branch.
+
+- The scheduled git pull (`C:\lifeos\scripts\pull.ps1`) always pulls from `main`
+- Changes on `dev` do **not** reach Windows until a release is cut
+- To deploy new code: follow `/skills/git-release.md` on the Mac, then Windows will pick it up on its next scheduled pull
+
+Update `pull.ps1` to make the branch explicit:
+
+```powershell
+cd C:\lifeos
+git pull origin main
+```
