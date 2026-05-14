@@ -31,7 +31,7 @@ export default async function OverviewPage() {
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">Command Center</h1>
         <span
-          className={`px-2 py-0.5 rounded text-xs font-mono ${health ? "text-green-400" : "text-red-400"}`}
+          className={`px-2 py-0.5 rounded text-xs font-mono ${health ? "text-green-600" : "text-red-500"}`}
           style={{ background: "var(--surface)" }}
         >
           {health ? "● online" : "● offline"}
@@ -91,14 +91,14 @@ function Row({ children }: { children: React.ReactNode }) {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="px-2 py-0.5 rounded text-xs font-mono" style={{ background: "#1e1b4b", color: "var(--accent)" }}>
+    <span className="px-2 py-0.5 rounded text-xs font-mono" style={{ background: "#eef2ff", color: "var(--accent)" }}>
       {children}
     </span>
   );
 }
 
 function StatusDot({ ok }: { ok: boolean }) {
-  return <span className={`text-xs ${ok ? "text-green-400" : "text-red-400"}`}>{ok ? "●" : "●"}</span>;
+  return <span className={`text-xs ${ok ? "text-green-600" : "text-red-500"}`}>{ok ? "●" : "●"}</span>;
 }
 
 function Empty() {

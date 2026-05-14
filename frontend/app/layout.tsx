@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link
               key={n.href}
               href={n.href}
-              className="transition-colors hover:text-white"
+              className="transition-colors hover:text-gray-900"
               style={{ color: "var(--muted)" }}
             >
               {n.label}

@@ -20,9 +20,9 @@ async function fetchTasks(): Promise<TaskRow[]> {
 }
 
 const statusColor: Record<string, string> = {
-  pending: "text-yellow-400",
-  done: "text-green-400",
-  failed: "text-red-400",
+  pending: "text-yellow-600",
+  done: "text-green-600",
+  failed: "text-red-500",
 };
 
 export default async function TasksPage() {
@@ -51,7 +51,7 @@ export default async function TasksPage() {
                 )}
               </div>
               {t.agent && (
-                <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "#1e1b4b", color: "var(--accent)" }}>
+                <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: "#eef2ff", color: "var(--accent)" }}>
                   {t.agent}
                 </span>
               )}
