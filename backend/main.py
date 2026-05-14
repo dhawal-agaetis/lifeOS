@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from backend.memory.db import init_db
-from backend.routers import agents, tasks, emails, openclaw
+from backend.routers import agents, tasks, emails, openclaw, orders
 from backend.scheduler.jobs import start_scheduler
 
 
@@ -28,6 +28,7 @@ app.include_router(agents.router, prefix="/agents", tags=["agents"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(emails.router, prefix="/emails", tags=["emails"])
 app.include_router(openclaw.router, prefix="/openclaw", tags=["openclaw"])
+app.include_router(orders.router, prefix="/orders", tags=["orders"])
 
 
 @app.get("/health")

@@ -12,6 +12,7 @@ const nav = [
   { href: "/emails", label: "Emails" },
   { href: "/tasks", label: "Tasks" },
   { href: "/logs", label: "Logs" },
+  { href: "/houseofworktops", label: "House of Worktops" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

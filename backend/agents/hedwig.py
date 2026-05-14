@@ -6,7 +6,8 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
-from backend.memory.schema import AgentLog, Email, Order
+from backend.memory.schema import AgentLog, Email, Order, OrderCustomer, OrderItem
+from backend.tools.order_parser import parse_order_email
 
 load_dotenv()
 
@@ -105,13 +106,15 @@ def run(task: str, db: Session, accounts: list[str] | None = None) -> str:
 
         lines: list[str] = []
         for raw in emails:
-            parsed = _parse_email(account, raw)
-            _save_email(db, raw, parsed, account)
-
-            if account == "houseofworktops" and parsed.get("is_order"):
-                _save_order(db, parsed.get("order_details", {}), raw["gmail_id"])
-
-            lines.append(_format_line(account, raw, parsed))
+            if account == "houseofworktops" and is_order_email(raw["subject"], raw["sender"]):
+                parsed_order = parse_order_email(raw["subject"], raw.get("body", raw["body_preview"]), raw["gmail_id"])
+                _save_order_atomic(db, parsed_order, account)
+                _save_email(db, raw, {"is_order": True, "summary": f"Order {parsed_order['order']['order_id']}"}, account)
+                lines.append(f"• {raw['sender']}: Order {parsed_order['order']['order_id']} — {parsed_order['order']['status']}")
+            else:
+                parsed = _parse_email(account, raw)
+                _save_email(db, raw, parsed, account)
+                lines.append(_format_line(account, raw, parsed))
 
         total += len(emails)
         header = f"*{_label(account)}* ({len(emails)} unread)"
@@ -187,26 +190,78 @@ def _save_email(db: Session, raw: dict, parsed: dict, account: str):
     db.commit()
 
 
-def _save_order(db: Session, od: dict, raw_email_id: str):
-    if not od:
+def is_order_email(subject: str, sender: str) -> bool:
+    """True when the email looks like a HoW order confirmation from noreply."""
+    is_order_subject = bool(
+        subject and (
+            "house of worktops - order" in subject.lower()
+            or "house of worktops - sample order" in subject.lower()
+        )
+    )
+    is_noreply = "noreply" in sender.lower()
+    return is_order_subject and is_noreply
+
+
+def _save_order_atomic(db: Session, parsed: dict, source_email: str):
+    """Save order, customer, and items atomically. Skips if order_id already exists."""
+    od = parsed.get("order") or {}
+    order_id = od.get("order_id")
+    if not order_id:
+        logger.warning("Hedwig: skipping order with no order_id")
         return
-    order_date = None
-    if od.get("order_date"):
-        try:
-            order_date = datetime.fromisoformat(od["order_date"])
-        except ValueError:
-            pass
-    db.add(Order(
-        order_id=od.get("order_id"),
-        customer_name=od.get("customer_name"),
-        customer_email=od.get("customer_email"),
-        product=od.get("product"),
-        amount=od.get("amount"),
-        currency=od.get("currency", "GBP"),
-        order_date=order_date,
-        raw_email_id=raw_email_id,
-    ))
-    db.commit()
+
+    existing = db.query(Order).filter(Order.order_id == order_id).first()
+    if existing:
+        logger.info(f"Hedwig: order {order_id} already in DB — skipping")
+        return
+
+    try:
+        order = Order(
+            order_id=order_id,
+            date_added=od.get("date_added"),
+            status=od.get("status"),
+            subtotal=od.get("subtotal"),
+            vat=od.get("vat"),
+            grand_total=od.get("grand_total"),
+            comments=od.get("comments"),
+            deliver_by=od.get("deliver_by"),
+            is_business_customer=od.get("is_business_customer", False),
+            raw_email_id=od.get("raw_email_id"),
+            source_email=source_email,
+        )
+        db.add(order)
+
+        cust = parsed.get("customer") or {}
+        db.add(OrderCustomer(
+            order_id=order_id,
+            name=cust.get("name"),
+            email=cust.get("email"),
+            postcode=cust.get("postcode"),
+            phone=cust.get("phone"),
+        ))
+
+        for item in parsed.get("items") or []:
+            db.add(OrderItem(
+                order_id=order_id,
+                product_name=item.get("product_name"),
+                product_sku=item.get("product_sku"),
+                quantity=item.get("quantity"),
+                unit_price=item.get("unit_price"),
+                line_total=item.get("line_total"),
+            ))
+
+        db.commit()
+        logger.info(f"Hedwig: saved order {order_id} — £{od.get('grand_total', 0)}")
+        db.add(AgentLog(
+            agent_name="hedwig",
+            task=f"parse order {order_id}",
+            result=f"order_id={order_id} grand_total={od.get('grand_total')}",
+            status="success",
+        ))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Hedwig: failed to save order {order_id}: {e}")
 
 
 def _log_agent(db: Session, task: str, result: str, status: str):
