@@ -24,6 +24,14 @@
 - `backend/routers/orders.py`: added `POST /orders/backfill` — fetches all historical HoW order emails, parses, inserts new ones (idempotent), returns `{found, new, skipped}`
 - Backfill ran: 40 order emails found, 39 new orders inserted, 1 skipped (already in DB); all 40 orders now have full data (date_added, status, grand_total, customer, items)
 
+### Session — Fix order email subject matching (was: 40 found, now: 104)
+- Root cause 1: shop system sends subjects with a **double space** before "Order" — `"House of Worktops -  Order 162125"`. Old filter used single-space match so all regular orders were missed; only "Sample Order" (single space) was caught.
+- Root cause 2: "How Trade Partners -  Order" pattern was not in the filter at all.
+- Root cause 3: backfill Gmail query only searched `"House of Worktops"` — never fetched "How Trade Partners" emails.
+- Fix: `backend/agents/hedwig.py` → `is_order_email()` now normalises whitespace with `" ".join(subject.lower().split())` before matching; added "how trade partners - order" as third pattern.
+- Fix: `backend/routers/orders.py` → `orders_backfill()` now runs two Gmail queries ("House of Worktops" + "How Trade Partners"), deduped by gmail_id.
+- Backfill re-ran: found=107 emails, new=64 orders inserted, skipped=43; DB now has 104 unique orders, £7,211.64 total revenue.
+
 ### Session — Gmail OAuth for houseofworktops
 - `backend/tools/gmail_auth.py`: new CLI script — takes account name as arg, prompts for credentials JSON path, runs browser OAuth flow, saves token to `gmail_tokens/<account>.json`
 - `backend/tools/gmail.py`: refactored — no longer requires env vars once token exists; `_get_service` loads from token file only and auto-refreshes; added `load_gmail_service()`, `get_emails_by_subject_pattern()`, richer email fields (date, snippet, full_body)
@@ -109,9 +117,13 @@ cd frontend && npm run dev
 **Hedwig** — Gmail intelligence. Loops accounts in priority order: houseofworktops → agaetis → personal. houseofworktops order emails detected by `is_order_email()`, parsed by `order_parser.py`, saved atomically to 3 tables. Non-order emails go to Claude with account-specific prompts. Returns sectioned digest back to Albus. Skips unauthenticated accounts gracefully.
 
 ### Order email detection (Hedwig)
-- Subject must contain "House of Worktops - Order" or "House of Worktops - Sample Order" (case-insensitive)
+- Whitespace-normalised subject must contain one of (case-insensitive):
+  - "house of worktops - order" (covers single and double-space variants)
+  - "house of worktops - sample order"
+  - "how trade partners - order"
 - Sender must contain "noreply"
 - Both conditions must be true — is_order_email(subject, sender)
+- Note: shop system sends "House of Worktops -  Order" (double space) — normalisation handles this
 
 ### Order parser (`backend/tools/order_parser.py`)
 - `parse_order_email(subject, body, email_id)` → `{ order, customer, items }`

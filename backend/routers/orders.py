@@ -169,8 +169,17 @@ def orders_backfill(db: Session = Depends(get_db)):
     if not is_authenticated("houseofworktops"):
         return {"error": "houseofworktops account not authenticated — run gmail_auth.py first"}
 
-    emails = get_all_emails_by_subject_pattern("houseofworktops", "House of Worktops")
-    order_emails = [e for e in emails if is_order_email(e["subject"], e["sender"])]
+    # Fetch both sender brands — "How Trade Partners" emails won't appear in a
+    # "House of Worktops" subject search, so we query both and dedup by gmail_id.
+    raw_1 = get_all_emails_by_subject_pattern("houseofworktops", "House of Worktops")
+    raw_2 = get_all_emails_by_subject_pattern("houseofworktops", "How Trade Partners")
+    seen_ids: set[str] = set()
+    all_emails = []
+    for e in raw_1 + raw_2:
+        if e["gmail_id"] not in seen_ids:
+            seen_ids.add(e["gmail_id"])
+            all_emails.append(e)
+    order_emails = [e for e in all_emails if is_order_email(e["subject"], e["sender"])]
 
     found = len(order_emails)
     new_count = 0

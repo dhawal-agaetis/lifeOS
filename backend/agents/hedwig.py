@@ -200,12 +200,19 @@ def _save_email(db: Session, raw: dict, parsed: dict, account: str):
 
 
 def is_order_email(subject: str, sender: str) -> bool:
-    """True when the email looks like a HoW order confirmation from noreply."""
-    is_order_subject = bool(
-        subject and (
-            "house of worktops - order" in subject.lower()
-            or "house of worktops - sample order" in subject.lower()
-        )
+    """True when the email looks like a HoW order confirmation from noreply.
+
+    Normalises whitespace before matching — the shop system emits subjects with
+    a double space before 'Order' (e.g. 'House of Worktops -  Order 162125').
+    """
+    if not subject:
+        return False
+    # collapse any run of whitespace to a single space so " -  Order" == " - Order"
+    s = " ".join(subject.lower().split())
+    is_order_subject = (
+        "house of worktops - order" in s
+        or "house of worktops - sample order" in s
+        or "how trade partners - order" in s
     )
     is_noreply = "noreply" in sender.lower()
     return is_order_subject and is_noreply
