@@ -83,11 +83,28 @@ Hedwig          Dobby         (future agents)
 
 ---
 
+## Git Strategy
+- main = stable only, never work directly on it
+- dev = active development, all Claude Code work goes here
+- feature/<name> = optional, for large isolated changes, branch from dev
+- Never push directly to main
+- To release: merge dev into main, tag with version number
+- Tag format: v<major>.<minor>.<patch>
+  - patch = small fix or addition
+  - minor = new agent or feature complete
+  - major = phase complete or breaking change
+
+## Current Versions
+- v0.1.0 — Phase 1 complete (Albus, Dobby, Hedwig, SQLite, FastAPI, Next.js)
+
+---
+
 ## Skills
 - New agent: /skills/add-agent.md
 - DB changes: /skills/add-db-table.md
 - Obsidian notes: /skills/obsidian-note.md
 - Debugging an agent: /skills/debug-agent.md
+- Git release: /skills/git-release.md
 
 ---
 
