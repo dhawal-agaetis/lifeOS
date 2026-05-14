@@ -99,7 +99,17 @@ Hedwig          Dobby         (future agents)
 
 ---
 
+## Session Rules
+- One session per task or feature, not per day
+- Start every session: read context/handover.md and context/patterns.md — follow /skills/start-of-session.md
+- End every session: follow /skills/end-of-session.md
+- Never work directly on main
+
+---
+
 ## Skills
+- Start of session: /skills/start-of-session.md
+- End of session: /skills/end-of-session.md
 - New agent: /skills/add-agent.md
 - DB changes: /skills/add-db-table.md
 - Obsidian notes: /skills/obsidian-note.md
