@@ -10,7 +10,7 @@
 - CI: ruff + pytest on push to main
 - Git: v0.1.0 tagged on main, dev is the working branch
 
-### This session — House of Worktops order parsing
+### Session — House of Worktops order parsing
 - DB schema: replaced single `orders` table with three tables: `orders` (rich fields), `order_customers`, `order_items`
 - `backend/tools/order_parser.py`: pure-regex parser, returns `{ order, customer, items }`, never crashes on missing fields
 - `backend/agents/hedwig.py`: added `is_order_email(subject, sender)` check; order emails skip Claude and go directly to parser; atomic save via `_save_order_atomic` (rollback on failure, idempotent on duplicate order_id)
@@ -18,16 +18,23 @@
 - `frontend/app/houseofworktops/page.tsx`: client component — stats bar, record cards, filterable+sortable orders table with expandable rows showing full detail, auto-refreshes every 5 min
 - Nav updated: "House of Worktops" link added
 
+### Session — Gmail OAuth for houseofworktops
+- `backend/tools/gmail_auth.py`: new CLI script — takes account name as arg, prompts for credentials JSON path, runs browser OAuth flow, saves token to `gmail_tokens/<account>.json`
+- `backend/tools/gmail.py`: refactored — no longer requires env vars once token exists; `_get_service` loads from token file only and auto-refreshes; added `load_gmail_service()`, `get_emails_by_subject_pattern()`, richer email fields (date, snippet, full_body)
+- houseofworktops OAuth completed and verified: 5 unread emails fetched, 20 order emails found
+- Token saved at `backend/tools/gmail_tokens/houseofworktops.json` (gitignored)
+
 ## In progress
 - Nothing active — all code written, not yet live on Windows
 
 ## Start next session with
 Windows machine setup:
-1. Run Gmail OAuth for each of the three accounts
-2. Install and configure OpenClaw, point webhook at `http://localhost:8000/openclaw/message`
-3. Set up NSSM services for FastAPI and Next.js (see `/docs/windows-setup.md`)
-4. Set `OBSIDIAN_VAULT_PATH` in `.env`
-5. Write first real tests in `/tests/` — order_parser is a good first target (pure functions, no DB)
+1. Copy `backend/tools/gmail_tokens/houseofworktops.json` to Windows machine (secure transfer)
+2. Run Gmail OAuth for personal and agaetis accounts on Windows: `python tools/gmail_auth.py personal` / `agaetis`
+3. Install and configure OpenClaw, point webhook at `http://localhost:8000/openclaw/message`
+4. Set up NSSM services for FastAPI and Next.js (see `/docs/windows-setup.md`)
+5. Set `OBSIDIAN_VAULT_PATH` in `.env`
+6. Write first real tests in `/tests/` — order_parser is a good first target (pure functions, no DB)
 
 ## Files touched this session
 - `backend/memory/schema.py` — replaced Order model; added OrderCustomer, OrderItem
@@ -107,10 +114,15 @@ cd frontend && npm run dev
 ### Gmail tool (`backend/tools/gmail.py`)
 - Multi-account OAuth2 via Google API
 - Token files: `backend/tools/gmail_tokens/{personal,agaetis,houseofworktops}.json` — gitignored
-- First-time setup per account:
+- First-time setup per account (requires downloaded OAuth credentials JSON from Google Cloud Console):
   ```bash
-  PYTHONPATH=. .venv/bin/python -c "from backend.tools.gmail import authenticate; authenticate('personal')"
+  python backend/tools/gmail_auth.py houseofworktops
+  # prompts for path to credentials JSON, opens browser, saves token
   ```
+- `load_gmail_service(account)` → authenticated service object
+- `get_unread_emails(account, max_results=10)` → list of `{id, subject, sender, date, snippet, body_preview, full_body}`
+- `get_emails_by_subject_pattern(account, pattern, max_results=20)` → filtered by subject
+- `mark_as_read(account, email_id)`
 
 ### Environment variables (see `.env.example` for full list)
 

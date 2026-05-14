@@ -14,7 +14,8 @@ Last updated: 2026-05-14
 | `agents/albus.py` | Orchestrator — routes WhatsApp messages via ROUTE:<agent>:<task> |
 | `agents/dobby.py` | Quick tasks — reminders, fast answers → tasks table |
 | `agents/hedwig.py` | Gmail triage — multi-account, order detection, digest back to Albus |
-| `tools/gmail.py` | Google OAuth2, multi-account email fetch |
+| `tools/gmail.py` | Google OAuth2, multi-account email fetch, subject-pattern search |
+| `tools/gmail_auth.py` | One-time OAuth CLI — takes credentials JSON, saves token file |
 | `tools/order_parser.py` | Pure-regex parser for HoW order confirmation emails |
 | `routers/agents.py` | GET /agents/logs |
 | `routers/tasks.py` | GET /tasks/, PATCH /tasks/{id}/status |
