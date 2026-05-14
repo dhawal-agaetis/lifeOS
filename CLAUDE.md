@@ -95,7 +95,7 @@ Hedwig          Dobby         (future agents)
   - major = phase complete or breaking change
 
 ## Current Versions
-- v0.1.0 — Phase 1 complete (Albus, Dobby, Hedwig, SQLite, FastAPI, Next.js)
+- v0.1.0 — Phase 1 complete (Albus, Dobby, Hedwig, SQLite, FastAPI, Next.js) — 2026-05-14
 
 ---
 

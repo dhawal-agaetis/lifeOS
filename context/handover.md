@@ -8,7 +8,7 @@
 - APScheduler: Hedwig runs every 30 min, daily summary at 08:00
 - Obsidian sync: daily note writer
 - CI: ruff + pytest on push to main
-- Git: v0.1.0 tagged on main, dev is the working branch
+- **v0.1.0 released 2026-05-14** — tagged on main, all Phase 1 work merged, dev is active branch
 
 ### Session — House of Worktops order parsing
 - DB schema: replaced single `orders` table with three tables: `orders` (rich fields), `order_customers`, `order_items`
@@ -39,17 +39,19 @@
 - Token saved at `backend/tools/gmail_tokens/houseofworktops.json` (gitignored)
 
 ## In progress
-- Nothing active — all code written, not yet live on Windows
+- v0.1.0 released — code complete, not yet live on Windows
 
 ## Start next session with
-Windows machine setup:
+**Goal: get OpenClaw + WhatsApp talking to Albus on the Windows machine**
+
+Windows machine setup order:
 1. Copy `backend/tools/gmail_tokens/houseofworktops.json` to Windows machine (secure transfer)
 2. Run Gmail OAuth for personal and agaetis accounts on Windows: `python tools/gmail_auth.py personal` / `agaetis`
 3. Install and configure OpenClaw, point webhook at `http://localhost:8000/openclaw/message`
 4. Set up NSSM services for FastAPI and Next.js (see `/docs/windows-setup.md`)
 5. Set `OBSIDIAN_VAULT_PATH` in `.env`
-6. Write first real tests in `/tests/` — order_parser is a good first target (pure functions, no DB)
-7. Run `POST /orders/backfill` on Windows after Gmail OAuth is set up to pull all historical orders into production DB
+6. Run `POST /orders/backfill` on Windows after Gmail OAuth is set up
+7. Write first real tests in `/tests/` — order_parser is a good first target (pure functions, no DB)
 
 ## Files touched this session
 - `backend/memory/schema.py` — replaced Order model; added OrderCustomer, OrderItem
