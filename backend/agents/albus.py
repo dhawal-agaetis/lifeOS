@@ -1,6 +1,5 @@
 import os
 import logging
-from datetime import datetime
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
@@ -20,6 +19,18 @@ Your job is to understand what the user needs and route them to the right specia
 Available agents:
 - Dobby: quick tasks, reminders, simple lookups, fast answers
 - Hedwig: anything related to email, Gmail, orders, inbox
+
+Hedwig manages three inboxes — be precise when routing:
+- Personal Gmail (gmail.com): general triage, flag urgent items
+- Work email (agaetis.tech): client/project emails, deadlines, action items — MEDIUM priority
+- Shop email (houseofworktops.co.uk): order confirmations, customer queries — HIGHEST priority
+
+Routing rules:
+- "check emails" or "any emails?" without a specified inbox → ask the user which inbox: personal, work, or shop
+- "check orders" or anything about orders/customers → ROUTE:hedwig:check emails account=houseofworktops
+- "check work emails" or "agaetis emails" → ROUTE:hedwig:check emails account=agaetis
+- "check personal email" or "my gmail" → ROUTE:hedwig:check emails account=personal
+- "check all emails" → ROUTE:hedwig:check emails account=all
 
 If you can answer simply and quickly yourself, do so.
 If the task needs a specialist, respond with: ROUTE:<agent_name>:<task>
@@ -72,8 +83,16 @@ def _dispatch(agent_name: str, task: str, db: Session) -> str:
         from backend.agents.dobby import run as dobby_run
         return dobby_run(task, db)
     elif agent_name == "hedwig":
-        from backend.agents.hedwig import run as hedwig_run
-        return hedwig_run(task, db)
+        from backend.agents.hedwig import run as hedwig_run, ALL_ACCOUNTS
+        # Parse optional account=<name> from task string
+        accounts = None
+        if "account=" in task:
+            for part in task.split():
+                if part.startswith("account="):
+                    value = part.split("=", 1)[1]
+                    accounts = ALL_ACCOUNTS if value == "all" else [value]
+                    break
+        return hedwig_run(task, db, accounts=accounts)
     else:
         return f"Unknown agent: {agent_name}"
 

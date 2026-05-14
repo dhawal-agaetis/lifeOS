@@ -19,9 +19,11 @@ build/
 # Logs
 logs/*.log
 
-# Gmail tokens
+# Gmail tokens and credentials (never commit these)
 token.json
 credentials.json
+credentials_*.json
+backend/tools/gmail_tokens/
 
 # Node / Next.js
 frontend/node_modules/

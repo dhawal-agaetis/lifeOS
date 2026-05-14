@@ -16,29 +16,89 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
 ]
 
-TOKEN_PATH = Path("token.json")
+TOKEN_DIR = Path(__file__).parent / "gmail_tokens"
+TOKEN_DIR.mkdir(exist_ok=True)
+
+# Account registry — maps account key to env var prefixes and token file
+ACCOUNTS = {
+    "personal": {
+        "client_id_env": "GMAIL_PERSONAL_CLIENT_ID",
+        "client_secret_env": "GMAIL_PERSONAL_CLIENT_SECRET",
+        "token_file": TOKEN_DIR / "personal.json",
+    },
+    "agaetis": {
+        "client_id_env": "GMAIL_AGAETIS_CLIENT_ID",
+        "client_secret_env": "GMAIL_AGAETIS_CLIENT_SECRET",
+        "token_file": TOKEN_DIR / "agaetis.json",
+    },
+    "houseofworktops": {
+        "client_id_env": "GMAIL_HOUSEOFWORKTOPS_CLIENT_ID",
+        "client_secret_env": "GMAIL_HOUSEOFWORKTOPS_CLIENT_SECRET",
+        "token_file": TOKEN_DIR / "houseofworktops.json",
+    },
+}
 
 
-def _get_service():
+def _get_service(account: str):
+    """Return an authenticated Gmail service for the given account."""
+    if account not in ACCOUNTS:
+        raise ValueError(f"Unknown account: {account!r}. Valid: {list(ACCOUNTS)}")
+
+    cfg = ACCOUNTS[account]
+    token_file: Path = cfg["token_file"]
+    client_id = os.getenv(cfg["client_id_env"])
+    client_secret = os.getenv(cfg["client_secret_env"])
+
+    if not client_id or not client_secret:
+        raise RuntimeError(
+            f"Missing env vars for account '{account}': "
+            f"{cfg['client_id_env']} and {cfg['client_secret_env']} must be set."
+        )
+
     creds = None
-
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+    if token_file.exists():
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Requires credentials.json downloaded from Google Cloud Console
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            client_config = {
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uris": ["http://localhost"],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            }
+            flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
             creds = flow.run_local_server(port=0)
-        TOKEN_PATH.write_text(creds.to_json())
+        token_file.write_text(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
 
 
-def get_unread_emails(max_results: int = 10) -> list[dict]:
-    service = _get_service()
+def authenticate(account: str):
+    """Run the one-time OAuth flow for an account. Call once per account on first setup."""
+    _get_service(account)
+    print(f"✓ Authenticated: {account} → {ACCOUNTS[account]['token_file']}")
+
+
+def is_authenticated(account: str) -> bool:
+    """Return True if a valid token already exists for this account."""
+    token_file = ACCOUNTS[account]["token_file"]
+    if not token_file.exists():
+        return False
+    try:
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+        return creds.valid or bool(creds.refresh_token)
+    except Exception:
+        return False
+
+
+def get_unread_emails(account: str, max_results: int = 10) -> list[dict]:
+    service = _get_service(account)
     result = service.users().messages().list(
         userId="me",
         labelIds=["UNREAD"],
@@ -47,18 +107,19 @@ def get_unread_emails(max_results: int = 10) -> list[dict]:
 
     messages = result.get("messages", [])
     emails = []
-
     for msg in messages:
         detail = service.users().messages().get(
             userId="me", id=msg["id"], format="full"
         ).execute()
-        emails.append(_parse_message(detail))
+        parsed = _parse_message(detail)
+        parsed["account"] = account
+        emails.append(parsed)
 
     return emails
 
 
-def mark_as_read(email_id: str) -> bool:
-    service = _get_service()
+def mark_as_read(account: str, email_id: str) -> bool:
+    service = _get_service(account)
     service.users().messages().modify(
         userId="me",
         id=email_id,
@@ -67,8 +128,8 @@ def mark_as_read(email_id: str) -> bool:
     return True
 
 
-def send_email(to: str, subject: str, body: str) -> bool:
-    service = _get_service()
+def send_email(account: str, to: str, subject: str, body: str) -> bool:
+    service = _get_service(account)
     raw = _build_raw_message(to, subject, body)
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
     return True

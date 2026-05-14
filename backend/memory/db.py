@@ -32,3 +32,16 @@ def init_db():
     # Import all models so Base knows about them before creating tables
     from backend.memory import schema  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    _migrate()
+
+
+def _migrate():
+    """Apply additive schema changes that create_all won't handle on existing tables."""
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        # emails.account — added when multi-account Gmail support was introduced
+        try:
+            conn.execute(text("ALTER TABLE emails ADD COLUMN account VARCHAR(50) DEFAULT 'unknown'"))
+            conn.commit()
+        except Exception:
+            pass  # column already exists

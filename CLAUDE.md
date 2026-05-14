@@ -91,10 +91,24 @@ Hedwig          Dobby         (future agents)
 
 ---
 
+## Email Accounts
+
+| Key | Address | Role | Priority |
+|---|---|---|---|
+| `personal` | gmail.com | General triage, flag urgent items to Albus | Normal |
+| `agaetis` | agaetis.tech | Client/project emails, tag by project, flag deadlines & action items | Medium |
+| `houseofworktops` | houseofworktops.co.uk | Parse all order confirmations → `orders` table, flag customer queries | **Highest** |
+
+OAuth tokens stored in `/backend/tools/gmail_tokens/{account}.json` — gitignored, never committed.
+One Google Cloud project per account. Run `authenticate(account)` once per account for first-time setup.
+
+---
+
 ## Conventions
 - All logs → /logs/<agent-name>.log
 - All DB logic → /backend/memory/db.py
 - All credentials → .env (never hardcode)
+- Gmail OAuth tokens → /backend/tools/gmail_tokens/ (gitignored, one file per account)
 - All agents communicate via shared DB, never directly
 - One agent, one responsibility
 - Comment why, not what
